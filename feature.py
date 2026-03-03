@@ -98,20 +98,23 @@ class FeatureExtraction:
                 pool.submit(self._check_dns): 'dns',
                 pool.submit(self._check_google_index): 'google',
             }
-            for future in as_completed(futures, timeout=8):
-                key = futures[future]
-                try:
-                    result = future.result()
-                    if key == 'page':
-                        self.response, self.soup = result
-                    elif key == 'whois':
-                        self.whois_data = result
-                    elif key == 'dns':
-                        self._dns_result = result
-                    elif key == 'google':
-                        self._google_indexed = result
-                except Exception:
-                    pass
+            try:
+                for future in as_completed(futures, timeout=20):
+                    key = futures[future]
+                    try:
+                        result = future.result()
+                        if key == 'page':
+                            self.response, self.soup = result
+                        elif key == 'whois':
+                            self.whois_data = result
+                        elif key == 'dns':
+                            self._dns_result = result
+                        elif key == 'google':
+                            self._google_indexed = result
+                    except Exception:
+                        pass
+            except TimeoutError:
+                pass
 
         # Pre-compute cached content features
         self._cached_hyperlink_ratios = None
@@ -120,7 +123,7 @@ class FeatureExtraction:
 
     def _fetch_page(self):
         try:
-            resp = requests.get(self.url, timeout=3, allow_redirects=True,
+            resp = requests.get(self.url, timeout=10, allow_redirects=True,
                                 headers={'User-Agent': 'Mozilla/5.0'})
             soup = BeautifulSoup(resp.text, 'html.parser')
             return resp, soup
@@ -624,45 +627,103 @@ class FeatureExtraction:
     def page_rank(self):
         return 0
 
-    # ===== MAIN METHOD =====
+    # ===== MAIN METHODS =====
 
-    def getFeaturesList(self):
+    def getFeaturesDict(self):
         h = self._hyperlink_ratios()
         r = self._redirection_ratios()
         m = self._media_ratios()
 
-        return [
-            self.length_url(), self.length_hostname(), self.ip(),
-            self.nb_dots(), self.nb_hyphens(), self.nb_at(),
-            self.nb_qm(), self.nb_and(), self.nb_or(),
-            self.nb_eq(), self.nb_underscore(), self.nb_tilde(),
-            self.nb_percent(), self.nb_slash(), self.nb_star(),
-            self.nb_colon(), self.nb_comma(), self.nb_semicolumn(),
-            self.nb_dollar(), self.nb_space(), self.nb_www(),
-            self.nb_com(), self.nb_dslash(), self.http_in_path(),
-            self.https_token(), self.ratio_digits_url(), self.ratio_digits_host(),
-            self.punycode(), self.port(), self.tld_in_path(),
-            self.tld_in_subdomain(), self.abnormal_subdomain(), self.nb_subdomains(),
-            self.prefix_suffix(), self.random_domain(), self.shortening_service(),
-            self.path_extension(),
-            self.nb_redirection(), self.nb_external_redirection(),
-            self.length_words_raw(), self.char_repeat(),
-            self.shortest_words_raw(), self.shortest_word_host(), self.shortest_word_path(),
-            self.longest_words_raw(), self.longest_word_host(), self.longest_word_path(),
-            self.avg_words_raw(), self.avg_word_host(), self.avg_word_path(),
-            self.phish_hints(), self.domain_in_brand(),
-            self.brand_in_subdomain(), self.brand_in_path(),
-            self.suspecious_tld(), self.statistical_report(),
-            self.nb_hyperlinks(), h[0], h[1], h[2],
-            self.nb_extCSS(), r[0], r[1],
-            0, 0,  # ratio_intErrors, ratio_extErrors (near-zero importance, very slow)
-            self.login_form(), self.external_favicon(),
-            self.links_in_tags(), self.submit_email(),
-            m[0], m[1],
-            self.sfh(), self.iframe(), self.popup_window(),
-            self.safe_anchor(), self.onmouseover(), self.right_clic(),
-            self.empty_title(), self.domain_in_title(), self.domain_with_copyright(),
-            self.whois_registered_domain(), self.domain_registration_length(),
-            self.domain_age(), self.web_traffic(),
-            self.dns_record(), self.google_index(), self.page_rank(),
-        ]
+        return {
+            'length_url': self.length_url(),
+            'length_hostname': self.length_hostname(),
+            'ip': self.ip(),
+            'nb_dots': self.nb_dots(),
+            'nb_hyphens': self.nb_hyphens(),
+            'nb_at': self.nb_at(),
+            'nb_qm': self.nb_qm(),
+            'nb_and': self.nb_and(),
+            'nb_or': self.nb_or(),
+            'nb_eq': self.nb_eq(),
+            'nb_underscore': self.nb_underscore(),
+            'nb_tilde': self.nb_tilde(),
+            'nb_percent': self.nb_percent(),
+            'nb_slash': self.nb_slash(),
+            'nb_star': self.nb_star(),
+            'nb_colon': self.nb_colon(),
+            'nb_comma': self.nb_comma(),
+            'nb_semicolumn': self.nb_semicolumn(),
+            'nb_dollar': self.nb_dollar(),
+            'nb_space': self.nb_space(),
+            'nb_www': self.nb_www(),
+            'nb_com': self.nb_com(),
+            'nb_dslash': self.nb_dslash(),
+            'http_in_path': self.http_in_path(),
+            'https_token': self.https_token(),
+            'ratio_digits_url': self.ratio_digits_url(),
+            'ratio_digits_host': self.ratio_digits_host(),
+            'punycode': self.punycode(),
+            'port': self.port(),
+            'tld_in_path': self.tld_in_path(),
+            'tld_in_subdomain': self.tld_in_subdomain(),
+            'abnormal_subdomain': self.abnormal_subdomain(),
+            'nb_subdomains': self.nb_subdomains(),
+            'prefix_suffix': self.prefix_suffix(),
+            'random_domain': self.random_domain(),
+            'shortening_service': self.shortening_service(),
+            'path_extension': self.path_extension(),
+            'nb_redirection': self.nb_redirection(),
+            'nb_external_redirection': self.nb_external_redirection(),
+            'length_words_raw': self.length_words_raw(),
+            'char_repeat': self.char_repeat(),
+            'shortest_words_raw': self.shortest_words_raw(),
+            'shortest_word_host': self.shortest_word_host(),
+            'shortest_word_path': self.shortest_word_path(),
+            'longest_words_raw': self.longest_words_raw(),
+            'longest_word_host': self.longest_word_host(),
+            'longest_word_path': self.longest_word_path(),
+            'avg_words_raw': self.avg_words_raw(),
+            'avg_word_host': self.avg_word_host(),
+            'avg_word_path': self.avg_word_path(),
+            'phish_hints': self.phish_hints(),
+            'domain_in_brand': self.domain_in_brand(),
+            'brand_in_subdomain': self.brand_in_subdomain(),
+            'brand_in_path': self.brand_in_path(),
+            'suspecious_tld': self.suspecious_tld(),
+            'statistical_report': self.statistical_report(),
+            'nb_hyperlinks': self.nb_hyperlinks(),
+            'ratio_intHyperlinks': h[0],
+            'ratio_extHyperlinks': h[1],
+            'ratio_nullHyperlinks': h[2],
+            'nb_extCSS': self.nb_extCSS(),
+            'ratio_intRedirection': r[0],
+            'ratio_extRedirection': r[1],
+            'ratio_intErrors': 0,
+            'ratio_extErrors': 0,
+            'login_form': self.login_form(),
+            'external_favicon': self.external_favicon(),
+            'links_in_tags': self.links_in_tags(),
+            'submit_email': self.submit_email(),
+            'ratio_intMedia': m[0],
+            'ratio_extMedia': m[1],
+            'sfh': self.sfh(),
+            'iframe': self.iframe(),
+            'popup_window': self.popup_window(),
+            'safe_anchor': self.safe_anchor(),
+            'onmouseover': self.onmouseover(),
+            'right_clic': self.right_clic(),
+            'empty_title': self.empty_title(),
+            'domain_in_title': self.domain_in_title(),
+            'domain_with_copyright': self.domain_with_copyright(),
+            'whois_registered_domain': self.whois_registered_domain(),
+            'domain_registration_length': self.domain_registration_length(),
+            'domain_age': self.domain_age(),
+            'web_traffic': self.web_traffic(),
+            'dns_record': self.dns_record(),
+            'google_index': self.google_index(),
+            'page_rank': self.page_rank(),
+        }
+
+    def getFeaturesList(self):
+        d = self.getFeaturesDict()
+        return list(d.values())

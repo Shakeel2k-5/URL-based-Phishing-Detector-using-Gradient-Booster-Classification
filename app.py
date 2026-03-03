@@ -1,5 +1,6 @@
 import numpy as np
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import warnings
 import pickle
 import pandas as pd
@@ -20,6 +21,7 @@ with open("newmodel.pkl", "rb") as f:
         feature_names = None
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/", methods=['GET'])
 def home():
@@ -33,8 +35,14 @@ def predict():
         return jsonify({"status": "error", "message": "URL is required"}), 400
 
     obj = FeatureExtraction(url)
-    features = obj.getFeaturesList()
-    x = np.array(features).reshape(1, -1)
+    features_dict = obj.getFeaturesDict()
+
+    # Select only the features the model was trained on, in the correct order
+    if feature_names:
+        x = pd.DataFrame([[features_dict[f] for f in feature_names]], columns=feature_names)
+    else:
+        x = np.array(list(features_dict.values())).reshape(1, -1)
+
     y_pred = gbc.predict(x)[0]
 
     result = convertion(url, int(y_pred))
@@ -52,13 +60,11 @@ def feedback():
         actual_class = int(data['actual_class'])
 
         obj = FeatureExtraction(url)
-        features = obj.getFeaturesList()
-
-        row = features + [actual_class]
-        cols = ['UsingIP','LongURL','ShortURL','Symbol@','Redirecting//','PrefixSuffix-','SubDomains','HTTPS','DomainRegLen','Favicon','NonStdPort','HTTPSDomainURL','RequestURL','AnchorURL','LinksInScriptTags','ServerFormHandler','InfoEmail','AbnormalURL','WebsiteForwarding','StatusBarCust','DisableRightClick','UsingPopupWindow','IframeRedirection','AgeofDomain','DNSRecording','WebsiteTraffic','PageRank','GoogleIndex','LinksPointingToPage','StatsReport','class']
+        features_dict = obj.getFeaturesDict()
+        features_dict['class'] = actual_class
 
         feedback_file = 'DataFiles/feedback.csv'
-        df_new = pd.DataFrame([row], columns=cols)
+        df_new = pd.DataFrame([features_dict])
 
         if not os.path.exists(feedback_file):
             df_new.to_csv(feedback_file, index=False)
